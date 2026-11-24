@@ -6,7 +6,7 @@
 // stands at that end and every event is passed as it comes; scrubbed back,
 // it is the replay of the window so far.
 
-import { SHOWN, state, step, world, type Log, type State, type World, type YardEvent } from "./replay";
+import { heard, SHOWN, state, step, world, type Log, type State, type World, type YardEvent } from "./replay";
 import type { Yard } from "./yard";
 
 // Seconds of the yard a second of the page: 60x makes an hour a minute.
@@ -30,6 +30,7 @@ export class Player {
   private readonly times: number[];
   // How many of the window's events the state holds.
   private count = 0;
+  private hooks?: { count: number; heard: Record<string, number> };
 
   // now is the yard's time when the snapshot was taken, for a window that
   // ends there and not at its last event.
@@ -57,6 +58,13 @@ export class Player {
   // The window's events after a number, oldest first.
   after(seq: number): YardEvent[] {
     return this.log.events.filter((e) => e.seq > seq);
+  }
+
+  // By hook source, when its last hook came, up to the clock: worked out
+  // again only when the clock passed another event.
+  get heard(): Record<string, number> {
+    if (this.hooks?.count !== this.count) this.hooks = { count: this.count, heard: heard(this.log.events.slice(0, this.count)) };
+    return this.hooks.heard;
   }
 
   // One more event at the window's end. False for one the window holds

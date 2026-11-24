@@ -2,10 +2,13 @@ import { describe, expect, test } from "vitest";
 import { PEER_LENGTH, RETURN_Z, SIDING_Z, SLOT_PITCH, type Person } from "../src/layout";
 import {
   along,
+  away,
+  BIRDS_BACK,
   brake,
   curve,
   doing,
   exit,
+  flown,
   goods,
   GOODS_END,
   GOODS_MIN,
@@ -347,5 +350,39 @@ describe("a works' smoke", () => {
     expect(out(0.5, 0)).toEqual([]);
     expect(out(Infinity, 0)).toEqual([]);
     expect(smokes(3600)).toBe(true);
+  });
+});
+
+describe("a mast's birds", () => {
+  const MINUTE = 60_000;
+
+  test("three, back a minute, four and ten after their source's last hook", () => {
+    expect(BIRDS_BACK).toEqual([MINUTE, 4 * MINUTE, 10 * MINUTE]);
+    const last = 100 * MINUTE;
+    expect(away(undefined, last)).toEqual([false, false, false]);
+    // A hook still to come in the replay sends none away.
+    expect(away(last, last - 1)).toEqual([false, false, false]);
+    expect(away(last, last)).toEqual([true, true, true]);
+    expect(away(last, last + MINUTE - 1)).toEqual([true, true, true]);
+    expect(away(last, last + MINUTE)).toEqual([false, true, true]);
+    expect(away(last, last + 4 * MINUTE)).toEqual([false, false, true]);
+    expect(away(last, last + 10 * MINUTE)).toEqual([false, false, false]);
+  });
+
+  test("a bird flies up and out of sight, each its own way, and lands where it sat", () => {
+    for (let i = 0; i < BIRDS_BACK.length; i++) {
+      expect(flown(i, 0, true)).toEqual({ x: expect.closeTo(0), y: 0, z: expect.closeTo(0), size: 1, shade: 1, heading: 0 });
+      const half = flown(i, 0.5, true);
+      const gone = flown(i, 1, true);
+      expect(half.y).toBeGreaterThan(0);
+      expect(gone.y).toBeGreaterThan(half.y);
+      expect(Math.hypot(gone.x, gone.z)).toBeGreaterThan(Math.hypot(half.x, half.z));
+      expect(gone.size).toBeLessThan(half.size);
+      expect(gone.shade).toBe(0);
+      // Home is the way back.
+      expect(Math.abs(Math.abs(flown(i, 0.5, false).heading - half.heading) - Math.PI)).toBeLessThan(1e-9);
+    }
+    const ways = [0, 1, 2].map((i) => flown(i, 1, true)).map((p) => Math.atan2(p.z, p.x));
+    expect(new Set(ways).size).toBe(3);
   });
 });

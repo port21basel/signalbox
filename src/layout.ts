@@ -108,6 +108,15 @@ export const CREW_PITCH = 10;
 // from there, and at less it lay over the name of the silo beside it.
 export const TOWER_X = BOARD_X - CREW_PITCH;
 export const WIRE_Z = -12;
+// The wire's poles stand this far apart. A source of hooks has a mast of its
+// own this far before the wire, on the side of the signal boxes and clear of
+// them, in the middle between two of its poles: its short wire runs into the
+// long one. Behind the wire the peers' lines run. The first source's mast is
+// in the wire's third span: over the first two stand the wire's own sign and
+// a peer's, and a mast's would lie on them.
+export const POLE_PITCH = 12;
+export const MAST_Z = 2.5;
+export const MAST_SPAN = 2;
 export const PEER_Z = -17;
 export const PEER_PITCH = 4;
 // A peer's line has a rail each way, this far either side of its middle:
@@ -333,6 +342,13 @@ export interface SignalBox {
   at: Point;
 }
 
+// A source of hooks: its mast before the wire.
+export interface Mast {
+  key: string;
+  source: string;
+  at: Point;
+}
+
 // A provider's tower: the silo of the quota its agents burn, drawn as coal
 // in the indicators beside it.
 export interface Tower {
@@ -410,6 +426,7 @@ export interface Layout {
   boxes: SignalBox[];
   towers: Tower[];
   peers: PeerLine[];
+  masts: Mast[];
   // Where a billboard would stand: the next free peer slot, below the
   // peers' lines and the sources' stations. What draws decides whether one
   // stands there.
@@ -571,6 +588,7 @@ export function layout(yard: Yard, memory: Partial<Slots> = {}, now: number = Da
     boxes: [],
     towers: [],
     peers: [],
+    masts: [],
     billboard: { x: BILLBOARD_X, z: PEER_Z },
     wire: { at: { x: BOARD_X, z: WIRE_Z }, length: 0 },
   };
@@ -860,7 +878,10 @@ export function layout(yard: Yard, memory: Partial<Slots> = {}, now: number = Da
   // A slot of its own below those, as a station takes: what left the yard
   // keeps its slot above it, and a source's station its own.
   out.billboard.z = PEER_Z - ++rank * PEER_PITCH;
-  out.wire.length = Math.max(right, yard.crew.length * CREW_PITCH) - BOARD_X;
+  (yard.hooks ?? []).forEach((source, i) => {
+    out.masts.push({ key: `mast/${source}`, source, at: { x: BOARD_X + (MAST_SPAN + i + 0.5) * POLE_PITCH, z: WIRE_Z + MAST_Z } });
+  });
+  out.wire.length = Math.max(right, yard.crew.length * CREW_PITCH, BOARD_X + (MAST_SPAN + out.masts.length) * POLE_PITCH) - BOARD_X;
   return out;
 }
 
@@ -884,6 +905,7 @@ export function positions(l: Layout): Map<string, Point> {
   l.boxes.forEach((e) => put("box", e.key, e.at));
   l.towers.forEach((e) => put("tower", e.key, e.at));
   l.peers.forEach((e) => put("peer", e.key, e.at));
+  l.masts.forEach((e) => put("mast", e.key, e.at));
   // No billboard: it follows the peers' last slot, so a new peer moves it.
   put("wire", "wire", l.wire.at);
   return at;

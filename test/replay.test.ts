@@ -3,7 +3,7 @@ import window from "../public/events.json";
 import snapshot from "../public/yard.json";
 import { atWork, layout, people } from "../src/layout";
 import { Player } from "../src/player";
-import { calls, FAULTS, line, opening, outgrown, SHOWN, state, step, STRUCTURE, trains, world, type Log, type State, type YardEvent } from "../src/replay";
+import { calls, FAULTS, heard, line, opening, outgrown, SHOWN, state, step, STRUCTURE, trains, world, type Log, type State, type YardEvent } from "../src/replay";
 import type { Bead, Yard } from "../src/yard";
 
 // The committed snapshot and its events are the fixture: the demo yard and
@@ -396,7 +396,7 @@ describe("the committed day", () => {
     const keys = new Set(log.events.flatMap((e) => Object.keys(e)));
     expect([...keys].sort()).toEqual(["at", "bead", "data", "kind", "seq"]);
     const data = new Set(log.events.flatMap((e) => Object.keys(e.data ?? {})));
-    for (const key of data) expect(["from", "to", "stage", "outcome", "group", "session", "depot", "type", "peer", "kind", "crew", "reason"]).toContain(key);
+    for (const key of data) expect(["from", "to", "stage", "outcome", "group", "session", "depot", "type", "peer", "kind", "crew", "reason", "hook"]).toContain(key);
     // A stage is where a bead was made, on its created alone.
     for (const e of log.events) if (e.data?.stage !== undefined) expect(e.kind).toBe("created");
     // A reason is the yard's word for a landing, never what somebody wrote.
@@ -446,6 +446,8 @@ describe("the player", () => {
     expect(line({ seq: 4, at: "", kind: "dep_added", bead: "sextant-b", data: { from: "sextant-a", kind: "blocks" } })).toBe("dep added · sextant-b · waits for sextant-a");
     expect(line({ seq: 5, at: "", kind: "dep_removed", bead: "sextant-b", data: { from: "sextant-a", kind: "discovered-from" } })).toBe("dep removed · sextant-b · discovered-from sextant-a");
     expect(line({ seq: 6, at: "", kind: "source_call", data: { source: "snowflake", call: "query", status: "200" } })).toBe("source call · snowflake · query");
+    expect(line({ seq: 7, at: "", kind: "hook", data: { hook: "telegram", type: "message" } })).toBe("hook · telegram · message");
+    expect(line({ seq: 8, at: "", kind: "hook", data: { type: "issue" } })).toBe("hook · issue");
   });
 });
 
@@ -806,6 +808,18 @@ describe("live", () => {
     expect(p.state).toEqual(state(yard, { ...log, events: [...log.events, next] }));
   });
 
+  test("by source, when its last hook came up to the clock", () => {
+    const hook = (at: number, data?: YardEvent["data"]): YardEvent => ({ seq: at, at: new Date(at).toISOString(), kind: "hook", ...(data ? { data } : {}) });
+    const events = [hook(1000, { hook: "github" }), hook(2000, { hook: "telegram" }), hook(3000, { hook: "github" }), hook(4000), hook(5000, { hook: "telegram" })];
+    expect(heard(events)).toEqual({ github: 3000, telegram: 5000 });
+    expect(heard([])).toEqual({});
+    const p = new Player({ ...yard, beads: [] }, { taken_at: "", beads: [], events }, 6000);
+    p.seek(2500);
+    expect(p.heard).toEqual({ github: 1000, telegram: 2000 });
+    p.seek(6000);
+    expect(p.heard).toEqual({ github: 3000, telegram: 5000 });
+  });
+
   test("a window without events yet starts now", () => {
     const p = new Player({ ...yard, beads: [] }, { taken_at: "", beads: [], events: [] }, 5000);
     p.follow();
@@ -836,5 +850,11 @@ describe("live", () => {
     // A group comes by its group_set, never by the claim that names it.
     expect(at("claimed", "sextant-a", { group: "a-new-group", session: "s1" })).toBe(false);
     expect(at("hook")).toBe(false);
+    // A hook from a source the snapshot has a mast for moves nothing; one
+    // from a source it has none for asks for the snapshot that draws one.
+    const masted = world({ ...yard, hooks: ["github"] }, log);
+    expect(outgrown(event("hook", undefined, { hook: "github", type: "issue" }), masted)).toBe(false);
+    expect(outgrown(event("hook", undefined, { hook: "telegram", type: "message" }), masted)).toBe(true);
+    expect(outgrown(event("hook", undefined, { type: "message" }), masted)).toBe(false);
   });
 });

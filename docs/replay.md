@@ -80,6 +80,19 @@ yard's end, and goods in come behind one of the peer's, which goes home when the
 One train runs each way at a time, and the next waits out of sight. A hook
 is a flash of the wire.
 
+Every source the window's hooks came from has a mast of its own before the
+wire, one to a span between its poles, with a short wire into the long one
+and the source's name on it, as a station's sign reads it ("Telegram",
+"Github"). The name is all a hook passes on: no text, no sender. Three small
+dark birds sit on its short wire. A hook from that source sends them up and
+out of sight, and they come back one by one, a minute, four and ten after
+its last hook, by the replay's clock; a hook before they are all back sends
+every one off again. While any is away, that source said something lately.
+A scrub has them where they would be at that time, at once, and so has
+`prefers-reduced-motion`. The view lists no hooks, so a source whose last
+hook is older than the window has no mast until its next one: that hook
+takes a new snapshot, which draws it.
+
 What went wrong is drawn too, and says under the pointer what and when
 ("held", "session stalled 14:02", "move refused 06:27"):
 

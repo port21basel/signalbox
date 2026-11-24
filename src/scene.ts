@@ -14,9 +14,11 @@ import {
   faulted,
   HEADSHUNT,
   left,
+  MAST_Z,
   PEER_RAIL_Z,
   people,
   PLATFORM_LENGTH,
+  POLE_PITCH,
   SHED_WIDTH,
   SIDING_Z,
   stationName,
@@ -25,6 +27,7 @@ import {
   type Point,
   type Coal,
   type Gate,
+  type Mast,
   type Shed,
   type Tower,
   type Vehicle,
@@ -33,11 +36,16 @@ import {
 } from "./layout";
 import {
   along,
+  away,
+  BIRDS_BACK,
   continueWalk,
   curve,
   doing,
   ease,
   exit,
+  flown,
+  FLY_BACK,
+  FLY_OFF,
   goods,
   GOODS_STAND,
   heading,
@@ -70,7 +78,6 @@ const SIGN_Z = 1.3;
 // A source station's sign stands this far along its line past its neighbour's,
 // each station one step further: at the fit zoom the signs read apart.
 const STATION_STEP = 32;
-const POLE_PITCH = 12;
 const POLE_HEIGHT = 3.2;
 // A signal box's sign, over its roof.
 const BOX_HEIGHT = 3.4;
@@ -99,6 +106,12 @@ const FADE = 0.2;
 const GOODS_LABEL_Y = 2.1;
 // The seconds the wire stays lit after a hook.
 const FLASH = 0.6;
+// A mast's birds: how big, and how often a wing beats in a second of flight.
+// A jump of the replay's clock longer than this is a scrub: the birds are
+// where they would be then, at once.
+const BIRD_SIZE = 1.5;
+const WINGBEATS = 4.5;
+const BIRDS_JUMP = 2 * 60_000;
 // A fault's lamp: the seconds of one flash, lit for the first half of it; how
 // high it stands on a wagon and over a platform.
 const BLINK = 0.8;
@@ -698,6 +711,17 @@ export function draw(l: Layout, kit: Kit, theme?: Theme, logo?: THREE.Texture): 
   }
   root.add(label("hooks", "wire", wire.at.x + 1, POLE_HEIGHT, wire.at.z, [0, 1]));
   grow(wire.at.x, wire.at.z, POLE_HEIGHT);
+  // A source of hooks: its mast before the wire, a short wire from it into
+  // the long one, and its name, as a station's sign reads it. Its birds are
+  // Stock's: they fly.
+  for (const m of l.masts) {
+    root.add(block(building.post[0], 0.16, POLE_HEIGHT, 0.16, m.at.x, GROUND_Y, m.at.z));
+    root.add(block(building.post[1], 1.2, 0.12, 0.12, m.at.x, POLE_HEIGHT - 0.3, m.at.z));
+    root.add(block("slate", 0.06, 0.06, MAST_Z, m.at.x, POLE_HEIGHT - 0.2, m.at.z - MAST_Z / 2));
+    // Beside the mast, half way up: over it the sign would hide the birds.
+    root.add(label(stationName(m.source), "wire", m.at.x + 0.4, POLE_HEIGHT / 2, m.at.z, [0, 0.5]));
+    grow(m.at.x, m.at.z, POLE_HEIGHT);
+  }
 
   let station = 0;
   for (const p of l.peers) {
@@ -809,6 +833,43 @@ interface Walker extends Mover {
 }
 
 // The turn that makes a figure look up or down the page.
+// A bird on a mast's short wire. gone is how far it is away (0 on the wire,
+// 1 out of sight), want where it is going; off whether it flies off or home.
+interface Bird {
+  object: THREE.Group;
+  wings: THREE.Object3D[];
+  source: string;
+  i: number;
+  gone: number;
+  want: number;
+  off: boolean;
+  // Seconds of its flight, for its wings; not placed yet: it is where it
+  // should be at once.
+  flying: number;
+  fresh: boolean;
+}
+
+// A bird of boxes, in the coal's dark: body, head and tail, and two wings
+// seen only in flight. It looks along x.
+function bird(): { object: THREE.Group; wings: THREE.Object3D[] } {
+  const object = new THREE.Group();
+  object.add(block(iron, 0.34, 0.16, 0.16, 0, 0, 0), block(iron, 0.13, 0.13, 0.13, 0.17, 0.14, 0));
+  const tail = block(iron, 0.16, 0.04, 0.1, -0.22, 0.11, 0);
+  tail.rotation.z = 0.35;
+  object.add(tail);
+  const wings = [-1, 1].map((side) => {
+    const wing = new THREE.Group();
+    wing.position.set(0, 0.15, side * 0.07);
+    wing.add(block(iron, 0.2, 0.03, 0.3, 0, -0.015, side * 0.15));
+    wing.userData.side = side;
+    wing.visible = false;
+    object.add(wing);
+    return wing;
+  });
+  object.scale.setScalar(BIRD_SIZE);
+  return { object, wings };
+}
+
 function facing(faces: 1 | -1): number {
   return (-faces * Math.PI) / 2;
 }
@@ -920,6 +981,11 @@ export class Stock {
   private readonly fumes = new THREE.Group();
   private readonly stacks = new Map<string, Stack>();
   private readonly lit: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
+  // The masts' birds, by their mast's key and their number, and the replay's
+  // clock they were last told.
+  private readonly birds = new Map<string, Bird>();
+  private readonly flock = new THREE.Group();
+  private heardAt?: number;
   private readonly snow?: Snow;
   private layout: Layout;
 
@@ -942,7 +1008,7 @@ export class Stock {
     );
     this.lit.position.set(wire.at.x + wire.length / 2, POLE_HEIGHT - 0.17, wire.at.z);
     this.lit.visible = false;
-    this.root.add(this.counts, this.posts, this.fumes, this.lit);
+    this.root.add(this.counts, this.posts, this.fumes, this.lit, this.flock);
     this.show(l, { tween: false });
   }
 
@@ -1127,6 +1193,7 @@ export class Stock {
     this.beat(0);
 
     this.fire(l, how.tween);
+    this.perch(l.masts);
 
     this.counts.clear();
     for (const c of l.counts) {
@@ -1146,6 +1213,7 @@ export class Stock {
     for (const walker of this.walkers.values()) this.stand(walker, 0);
     this.beat(0);
     for (const at of this.stacks.values()) this.fume(at, 0);
+    for (const b of this.birds.values()) this.fly(b, Infinity);
   }
 
   // What a wagon wears for what is wrong with its bead: chocks and a flag
@@ -1455,6 +1523,70 @@ export class Stock {
     this.land(this.give(engine.queue, { key, wagons, speed, close: [] }, true));
   }
 
+  // A bird for each of BIRDS_BACK on every mast's short wire: a mast that is
+  // new has them sitting, one that is gone takes them along.
+  private perch(masts: Mast[]) {
+    const wanted = new Set<string>();
+    const n = BIRDS_BACK.length;
+    for (const m of masts) {
+      for (let i = 0; i < n; i++) {
+        const key = `${m.key}/${i}`;
+        wanted.add(key);
+        if (this.birds.has(key)) continue;
+        const { object, wings } = bird();
+        // Along the short wire, the first nearest the long one.
+        object.position.set(m.at.x, POLE_HEIGHT - 0.14, m.at.z - (MAST_Z * (n - i)) / (n + 1));
+        object.userData.perch = object.position.clone();
+        object.userData.bird = key;
+        this.flock.add(object);
+        this.birds.set(key, { object, wings, source: m.source, i, gone: 0, want: 0, off: false, flying: 0, fresh: true });
+      }
+    }
+    for (const [key, b] of this.birds) {
+      if (wanted.has(key)) continue;
+      this.flock.remove(b.object);
+      this.birds.delete(key);
+    }
+  }
+
+  // The replay's clock, and by source when its last hook came up to it: a
+  // bird is away for its time after that (BIRDS_BACK). Moving on, the birds
+  // fly; a scrub (tween false, or a jump of the clock), a bird just placed,
+  // and a picture that does not move have them where they would be, at once.
+  hear(heard: Readonly<Record<string, number>>, clock: number, tween = true) {
+    const jumped = this.heardAt === undefined || Math.abs(clock - this.heardAt) > BIRDS_JUMP;
+    this.heardAt = clock;
+    for (const b of this.birds.values()) {
+      const want = away(heard[b.source], clock)[b.i] ? 1 : 0;
+      if (want !== b.want) b.off = want > b.gone;
+      b.want = want;
+      if (!tween || jumped || b.fresh || this.calm) this.fly(b, Infinity);
+      b.fresh = false;
+    }
+  }
+
+  // Bring a bird on by a time, towards where it is going. No time is there
+  // at once. True while it flies.
+  private fly(b: Bird, dt: number): boolean {
+    if (b.gone === b.want && b.flying === 0) return false;
+    if (!Number.isFinite(dt) || this.calm) b.gone = b.want;
+    else if (b.gone < b.want) b.gone = Math.min(b.want, b.gone + dt / FLY_OFF);
+    else b.gone = Math.max(b.want, b.gone - dt / FLY_BACK);
+    const flying = b.gone > 0 && b.gone < 1;
+    b.flying = flying ? b.flying + (Number.isFinite(dt) ? dt : 0) : 0;
+    const at = b.object.userData.perch as THREE.Vector3;
+    const pose = flown(b.i, b.gone, b.off);
+    b.object.position.set(at.x + pose.x, at.y + pose.y, at.z + pose.z);
+    b.object.rotation.y = pose.heading;
+    b.object.scale.setScalar(BIRD_SIZE * pose.size);
+    b.object.visible = pose.shade > 0;
+    for (const wing of b.wings) {
+      wing.visible = b.gone > 0;
+      wing.rotation.x = (wing.userData.side as number) * Math.sin(b.flying * WINGBEATS * 2 * Math.PI) * 0.9;
+    }
+    return flying;
+  }
+
   // A hook came in over the wire.
   flash() {
     this.lit.material.opacity = 1;
@@ -1547,6 +1679,9 @@ export class Stock {
       this.stand(walker, dt);
       // A figure with clips is never still, unless it was asked to be.
       if (walker.move || (walker.mixer && !this.calm)) moving = true;
+    }
+    for (const b of this.birds.values()) {
+      if (this.fly(b, dt)) moving = true;
     }
     if (this.lit.visible) {
       this.lit.material.opacity -= dt / FLASH;

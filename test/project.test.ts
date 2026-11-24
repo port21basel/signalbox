@@ -35,6 +35,7 @@ describe("the projection", () => {
       routes: [{ stage: "new", group: "builders", priority: 0 }],
       crew: [{ name: "yardmaster", kind: "claude", provider: "openai", state: "running" }],
       peers: [{ name: "quay", send: ["mail"] }],
+      hooks: [],
       beads: [
         { id: "signalbox-a", title: "a", type: "task", stage: "new", depot: "signalbox", working: true, priority: 2, created_at: "2099-01-01T00:00:00Z" },
         { id: "signalbox-b", title: "b", type: "task", stage: "backlog", depot: "signalbox", working: false, priority: 2, created_at: "2099-01-01T00:00:00Z" },
@@ -42,6 +43,31 @@ describe("the projection", () => {
       edges: [],
     });
     expect(JSON.stringify(yard)).not.toMatch(/secret|4wbdbdwypgzzjr5vgfwr/);
+  });
+
+  test("the hooks are the window's sources, by name, each once: never what they said", () => {
+    const hook = (seq: number, data: Raw): Raw => ({ seq, at: "t", kind: "hook", data });
+    const events = [
+      hook(1, { hook: "telegram", source: "telegram", type: "message", text: SECRET, from: SECRET }),
+      hook(2, { source: "github", type: "issue" }),
+      hook(3, { hook: "telegram", type: "message" }),
+      // No name, or one that is no name: no mast.
+      hook(4, { type: "comment" }),
+      hook(5, { hook: SECRET }),
+      hook(6, { hook: 7 }),
+      // A source call is no hook.
+      { seq: 7, at: "t", kind: "source_call", data: { source: "snowflake", call: "query" } },
+    ];
+    expect(yardOf({ ...lists, events }, "2099-01-01T00:00:00Z").hooks).toEqual(["github", "telegram"]);
+    expect(events.map((e) => eventOf(e, alias).data)).toEqual([
+      { type: "message", hook: "telegram" },
+      { type: "issue", hook: "github" },
+      { type: "message", hook: "telegram" },
+      { type: "comment" },
+      undefined,
+      undefined,
+      { source: "snowflake", call: "query" },
+    ]);
   });
 
   test("a bead's last session that ended badly is its fault, with the group it was of", () => {

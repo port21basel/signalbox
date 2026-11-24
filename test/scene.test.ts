@@ -2032,6 +2032,88 @@ describe("the shunters of the stock", () => {
   });
 });
 
+describe("the masts at the wire, and their birds", () => {
+  const MINUTE = 60_000;
+  const masted = layout({ ...yard, beads: [], hooks: ["github", "telegram"] });
+  const birds = (stock: Stock, source: string) => {
+    const out: THREE.Object3D[] = [];
+    stock.root.traverse((o) => {
+      if (typeof o.userData.bird === "string" && o.userData.bird.startsWith(`mast/${source}/`)) out.push(o);
+    });
+    return out.sort((a, b) => String(a.userData.bird).localeCompare(String(b.userData.bird)));
+  };
+  const sits = (o: THREE.Object3D) => o.visible && o.position.distanceTo(o.userData.perch as THREE.Vector3) < 1e-9;
+  const gone = (o: THREE.Object3D) => !o.visible;
+  const run = (stock: Stock, seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.05) stock.tick(0.05);
+  };
+
+  test("a source's mast has its name on it, as a station's sign reads it", () => {
+    const signs: string[] = [];
+    draw(masted, kit).root.traverse((o) => {
+      const el = (o as unknown as { element?: { textContent: string; className: string } }).element;
+      if (el?.className === "label wire") signs.push(el.textContent);
+    });
+    expect(signs).toEqual(["hooks", "Github", "Telegram"]);
+  });
+
+  test("three birds sit on each mast's wire; a hook sends its source's off, and they come back one by one", () => {
+    const stock = new Stock(masted, kit);
+    const T = Date.UTC(2099, 0, 1);
+    expect(birds(stock, "github")).toHaveLength(3);
+    expect(birds(stock, "telegram")).toHaveLength(3);
+    stock.hear({}, T - 1000);
+    expect(birds(stock, "telegram").every(sits)).toBe(true);
+
+    // The hook: off they fly, not all at once out of sight, and only its source's.
+    stock.hear({ telegram: T }, T);
+    expect(stock.tick(0.5)).toBe(true);
+    const flying = birds(stock, "telegram");
+    expect(flying.every((o) => o.visible && o.position.y > (o.userData.perch as THREE.Vector3).y)).toBe(true);
+    run(stock, 2);
+    expect(birds(stock, "telegram").every(gone)).toBe(true);
+    expect(birds(stock, "github").every(sits)).toBe(true);
+
+    // A minute on, the first is back; four, the second; ten, the last.
+    stock.hear({ telegram: T }, T + MINUTE);
+    run(stock, 3);
+    expect(birds(stock, "telegram").map(sits)).toEqual([true, false, false]);
+    stock.hear({ telegram: T }, T + 2 * MINUTE);
+    stock.hear({ telegram: T }, T + 4 * MINUTE);
+    run(stock, 3);
+    expect(birds(stock, "telegram").map(sits)).toEqual([true, true, false]);
+
+    // A new hook sends them all off again, the ones back too.
+    stock.hear({ telegram: T + 5 * MINUTE }, T + 5 * MINUTE);
+    run(stock, 2);
+    expect(birds(stock, "telegram").every(gone)).toBe(true);
+  });
+
+  test("a scrub, a jump of the clock, and a picture that does not move have them where they would be, at once", () => {
+    const stock = new Stock(masted, kit);
+    const T = Date.UTC(2099, 0, 1);
+    stock.hear({}, T);
+    // Scrubbed to five minutes after a hook: the first two are back, the last is away.
+    stock.hear({ telegram: T }, T + 5 * MINUTE, false);
+    expect(birds(stock, "telegram").map(sits)).toEqual([true, true, false]);
+    expect(gone(birds(stock, "telegram")[2]!)).toBe(true);
+    // A jump back before the hook: all on the wire, though the replay runs on.
+    stock.hear({}, T - 30 * MINUTE);
+    expect(birds(stock, "telegram").every(sits)).toBe(true);
+    // Asked for less motion: no flight.
+    stock.still = true;
+    stock.hear({ telegram: T - 30 * MINUTE }, T - 30 * MINUTE + 1000);
+    expect(birds(stock, "telegram").every(gone)).toBe(true);
+  });
+
+  test("a mast that is gone takes its birds along", () => {
+    const stock = new Stock(masted, kit);
+    stock.show(layout({ ...yard, beads: [], hooks: ["github"] }), { tween: true });
+    expect(birds(stock, "telegram")).toEqual([]);
+    expect(birds(stock, "github")).toHaveLength(3);
+  });
+});
+
 describe("the lamps of the wagons that wait", () => {
   const bead = (id: string, over: Partial<Bead> = {}): Bead => ({ id, title: id, type: "task", stage: "backlog", depot: "sextant", priority: 2, created_at: "2000-01-01T00:00:00Z", ...over });
   const at = (beads: Bead[], edges: Edge[]) => layout({ ...yard, beads, edges });

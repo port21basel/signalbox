@@ -247,27 +247,27 @@ const WAITS = [
 ];
 
 // What happens beside the beads: a peer's messages and the hooks of the
-// depots' hosting. A landing and a train in its pull request bring their own
+// depots' hosting, which come from its source: github. A landing and a train in its pull request bring their own
 // hooks (landed, below).
 const EXTRAS = [
   ["08:15", "peer_message_received", { peer: "quay", kind: "ping" }],
   ["08:15", "peer_message_sent", { peer: "quay", kind: "ping" }],
   ["09:26", "peer_message_received", { peer: "quay", kind: "mail" }],
   ["09:44", "peer_message_sent", { peer: "quay", kind: "mail" }],
-  ["10:11", "hook", { type: "comment" }],
-  ["10:40", "hook", { type: "issue" }],
+  ["10:11", "hook", { hook: "github", type: "comment" }],
+  ["10:40", "hook", { hook: "github", type: "issue" }],
   ["12:02", "peer_message_received", { peer: "quay", kind: "ping" }],
   ["12:02", "peer_message_sent", { peer: "quay", kind: "ping" }],
-  ["13:50", "hook", { type: "issue" }],
+  ["13:50", "hook", { hook: "github", type: "issue" }],
   // Two files cross before the mail that names them: its wagons.
   ["14:18", "peer_message_sent", { peer: "quay", kind: "file" }],
   ["14:18", "peer_message_sent", { peer: "quay", kind: "file" }],
   ["14:19", "peer_message_sent", { peer: "quay", kind: "mail" }],
-  ["15:34", "hook", { type: "comment" }],
-  ["15:42", "hook", { type: "comment" }],
+  ["15:34", "hook", { hook: "github", type: "comment" }],
+  ["15:42", "hook", { hook: "github", type: "comment" }],
   ["16:07", "peer_message_received", { peer: "quay", kind: "file" }],
   ["16:08", "peer_message_received", { peer: "quay", kind: "mail" }],
-  ["17:05", "hook", { type: "issue" }],
+  ["17:05", "hook", { hook: "github", type: "issue" }],
   ["18:20", "peer_message_sent", { peer: "quay", kind: "mail" }],
 ];
 
@@ -455,9 +455,9 @@ export function demo() {
   // What the hosting says after a push: its runs, then the checks' verdict.
   function landed(now) {
     const key = `hooks/${now}`;
-    emit(now + 30_000 + Math.floor(chance(key) * 20_000), "hook", undefined, { type: "workflow_run" });
-    emit(now + 2 * MINUTE + Math.floor(chance(`${key}/2`) * 40_000), "hook", undefined, { type: "workflow_run" });
-    emit(now + 3 * MINUTE + Math.floor(chance(`${key}/3`) * 50_000), "hook", undefined, { type: "check_suite" });
+    emit(now + 30_000 + Math.floor(chance(key) * 20_000), "hook", undefined, { hook: "github", type: "workflow_run" });
+    emit(now + 2 * MINUTE + Math.floor(chance(`${key}/2`) * 40_000), "hook", undefined, { hook: "github", type: "workflow_run" });
+    emit(now + 3 * MINUTE + Math.floor(chance(`${key}/3`) * 50_000), "hook", undefined, { hook: "github", type: "check_suite" });
   }
 
   const start = clock("06:00");

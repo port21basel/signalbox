@@ -13,6 +13,9 @@ export interface Yard {
   routes: Route[];
   crew: CrewMember[];
   peers: Peer[];
+  // The sources the window's hooks came from, by name: a mast each at the
+  // wire. A snapshot taken before the page drew them has none.
+  hooks?: string[];
   // The open beads.
   beads: Bead[];
   // The blocks edges that touch an open bead. A snapshot taken before the

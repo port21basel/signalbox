@@ -47,6 +47,8 @@ export interface YardEvent {
     status?: string;
     // Of a close: merged, a landing. No other reason leaves the yard.
     reason?: string;
+    // Of a hook: the name of the source it came from, and nothing it said.
+    hook?: string;
   };
 }
 
@@ -87,6 +89,8 @@ export interface World {
   // key: the bead's group when it has one, else the first the stage is routed
   // to, where that is a group of scripts. None at any other stage.
   works(bead: Bead, stage: string): string | undefined;
+  // The sources the snapshot has a mast for at the wire.
+  hooks: Set<string>;
 }
 
 export function world(yard: Yard, log: Log): World {
@@ -111,6 +115,7 @@ export function world(yard: Yard, log: Log): World {
       return stood ?? stages[0]?.stage;
     },
     terminal: (bead, stage) => flow(bead)?.stages.find((s) => s.stage === stage)?.terminal === true,
+    hooks: new Set(yard.hooks ?? []),
     works: (bead, stage) => {
       const at = flow(bead);
       if (!at) return undefined;
@@ -255,6 +260,8 @@ export const STRUCTURE = new Set([
 // does not know and the event would bring into the picture.
 export function outgrown(event: YardEvent, w: World): boolean {
   if (STRUCTURE.has(event.kind)) return true;
+  // A hook from a source with no mast yet: the next snapshot draws one.
+  if (event.kind === "hook" && event.data?.hook !== undefined && !w.hooks.has(event.data.hook)) return true;
   const enters = event.kind === "created" || event.kind === "advanced";
   return enters && event.bead !== undefined && !w.cast.has(event.bead);
 }
@@ -481,7 +488,7 @@ export function state(yard: Yard, log: Log, n: number = log.events.length): Stat
 
 // An event in one line, for the bar: kind, bead, from -> to.
 export function line(event: YardEvent): string {
-  const { from, to, outcome, peer, kind, group, type, source, call } = event.data ?? {};
+  const { from, to, outcome, peer, kind, group, type, source, call, hook } = event.data ?? {};
   const parts = [event.kind.replaceAll("_", " ")];
   if (event.bead !== undefined) parts.push(event.bead);
   if (from !== undefined && to !== undefined) parts.push(`${from} -> ${to}${outcome !== undefined ? ` (${outcome})` : ""}`);
@@ -489,6 +496,19 @@ export function line(event: YardEvent): string {
   else if (source !== undefined) parts.push(`${source}${call !== undefined ? ` · ${call}` : ""}`);
   else if (event.kind.startsWith("dep_") && from !== undefined) parts.push(kind === "blocks" ? `waits for ${from}` : `${kind ?? "edge"} ${from}`);
   else if (event.kind === "claimed" && group !== undefined) parts.push(group);
-  else if (event.kind === "hook" && type !== undefined) parts.push(type);
+  else if (event.kind === "hook" && (hook ?? type) !== undefined) parts.push([hook, type].filter((p) => p !== undefined).join(" · "));
   return parts.join(" · ");
+}
+
+// By source, when its last hook came, of some events: the time a mast's
+// birds count from. A hook with no source's name has no mast to fly from.
+export function heard(events: readonly YardEvent[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const e of events) {
+    const source = e.kind === "hook" ? e.data?.hook : undefined;
+    const at = Date.parse(e.at);
+    if (source === undefined || Number.isNaN(at)) continue;
+    out[source] = Math.max(out[source] ?? -Infinity, at);
+  }
+  return out;
 }

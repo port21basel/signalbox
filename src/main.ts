@@ -646,6 +646,7 @@ async function start() {
     let aged = player.clock;
     const present = (how: Show) => {
       stock.show(plan(player.state, player.clock), how);
+      stock.hear(player.heard, player.clock, how.tween);
       aged = player.clock;
       retell();
       if (!board.hidden) paintBoard();
@@ -874,6 +875,8 @@ async function start() {
       before = now;
       const playing = player.playing;
       run(dt);
+      // The masts' birds come back as the clock runs on, with no event.
+      stock.hear(player.heard, player.clock);
       const moving = stock.tick(dt);
       // A shunter took wagons on or let go of them in this frame.
       const clank = clankCue(playing, stock.coupled);

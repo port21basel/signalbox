@@ -27,7 +27,7 @@ works' doors and the bands of its chimneys in lavender, a hut's door in
 yellow and an office's in sky, and the bush that stands by each of those two
 in peach and in sapphire. A silo has no colour but its band, which is
 its provider's. The scene's own buildings, which are boxes, are their accents
-all over: a signal box, the telegraph's poles, a peer's board. The colour
+all over: a signal box, the telegraph's poles and a hook source's mast, a peer's board. The colour
 says nothing: a hut is a hut's in every depot.
 
 | building | walls | roof |

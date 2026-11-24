@@ -365,3 +365,37 @@ export function puff(i: number, seconds: number, burnt = Infinity): Puff | undef
     shade: PUFF_SHADE * Math.min(1, part / 0.12) * (1 - part),
   };
 }
+
+// A mast's birds: one for each time here, which is how long after its
+// source's last hook that bird is back on the wire. A hook sends every bird
+// off again, the ones already back too, and each counts from it anew.
+export const BIRDS_BACK = [60_000, 240_000, 600_000];
+// The seconds a bird takes to fly off and out of sight, and to land again.
+export const FLY_OFF = 1.5;
+export const FLY_BACK = 2.5;
+// How far out and how high a bird is when it is gone.
+const FLY_OUT = 30;
+const FLY_UP = 12;
+
+// Which of a mast's birds are away at a time of the replay, by when its
+// source's last hook came up to then: none before any.
+export function away(last: number | undefined, clock: number): boolean[] {
+  return BIRDS_BACK.map((back) => last !== undefined && last <= clock && clock < last + back);
+}
+
+// Bird i, gone so far (0 on the wire, 1 out of sight): where it is from its
+// place on the wire, how big, and the way it heads. Each flies out its own
+// way, up and away from the wire, and shrinks as it goes; it comes back the
+// same way, facing home.
+export function flown(i: number, gone: number, off: boolean): Puff & { heading: number } {
+  const way = -Math.PI / 2 + (i - 1) * 0.6;
+  const out = FLY_OUT * gone ** 1.6;
+  return {
+    x: Math.cos(way) * out,
+    y: FLY_UP * (1 - (1 - gone) ** 2),
+    z: Math.sin(way) * out,
+    size: gone > 0.75 ? Math.max(0.01, (1 - gone) / 0.25) : 1,
+    shade: gone < 1 ? 1 : 0,
+    heading: gone > 0 ? heading({ x: 0, z: 0 }, { x: Math.cos(way), z: Math.sin(way) }) + (off ? 0 : Math.PI) : 0,
+  };
+}

@@ -659,6 +659,9 @@
       ]
     }
   ],
+  "hooks": [
+    "github"
+  ],
   "beads": [
     {
       "id": "wharf-b2qe",

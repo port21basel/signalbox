@@ -6,6 +6,7 @@ import {
   atWork,
   BILLBOARD_X,
   BOARD_GAP,
+  BOARD_X,
   BOARD_HEAD,
   BOX_FRONT_Z,
   coal,
@@ -20,6 +21,8 @@ import {
   PARK_X,
   layout,
   left,
+  MAST_SPAN,
+  MAST_Z,
   PEER_PITCH,
   PEER_Z,
   people,
@@ -28,6 +31,7 @@ import {
   PLACE_X,
   PLACE_Z,
   PLATFORM_LENGTH,
+  POLE_PITCH,
   PLATFORM_Z,
   satKey,
   positions,
@@ -47,6 +51,7 @@ import {
   TAIL_PITCH,
   TAIL_X,
   TOWER_X,
+  WIRE_Z,
   travelOrder,
   weather,
   WORK_Z,
@@ -567,7 +572,7 @@ describe("the mapping", () => {
     // Every session of this yard's crews: both of wharf-builders, each at its wagon.
     expect(l.work.map((w) => w.key).sort()).toEqual(["sextant-n3wd", "wharf-z3fy"]);
     for (const w of l.work) expect(w.at.x).toBe(l.vehicles.find((v) => v.key === w.key)!.at.x);
-    expect(Object.keys(g).sort()).toEqual(["billboard", "boards", "boxes", "counts", "lamps", "peers", "platforms", "sheds", "sidings", "towers", "tracks", "vehicles", "wire", "work"]);
+    expect(Object.keys(g).sort()).toEqual(["billboard", "boards", "boxes", "counts", "lamps", "masts", "peers", "platforms", "sheds", "sidings", "towers", "tracks", "vehicles", "wire", "work"]);
   });
 
   test("the places taken are the limit less the sessions at work, and the sign's count is the sessions", () => {
@@ -1037,6 +1042,35 @@ describe("a station for every source the address names", () => {
       ["quay", "peer/quay"],
       ["snowflake", "source/snowflake"],
     ]);
+  });
+});
+
+describe("a mast at the wire for every source of hooks", () => {
+  test("before the wire, one to a span between its poles past its sign and a peer's, in the order the yard lists them", () => {
+    const hooked = copy();
+    hooked.hooks = ["github", "telegram"];
+    const l = layout(hooked);
+    expect(l.masts).toEqual([
+      { key: "mast/github", source: "github", at: { x: BOARD_X + (MAST_SPAN + 0.5) * POLE_PITCH, z: WIRE_Z + MAST_Z } },
+      { key: "mast/telegram", source: "telegram", at: { x: BOARD_X + (MAST_SPAN + 1.5) * POLE_PITCH, z: WIRE_Z + MAST_Z } },
+    ]);
+    expect(positions(l).get("mast:mast/telegram")).toEqual(l.masts[1]!.at);
+    // Clear of the signal boxes before the wire (their walls 1.5 from their
+    // middle), and the wire as long as the masts need.
+    expect(WIRE_Z + MAST_Z).toBeLessThan(CREW_Z - 1.5 - 0.5);
+    hooked.crew = [];
+    hooked.hooks = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
+    expect(layout(hooked).wire.length).toBeGreaterThanOrEqual((MAST_SPAN + 12) * POLE_PITCH);
+    // Past the wire's own sign and a peer's: a span or more right of both.
+    const first = layout({ ...copy(), hooks: ["github"] });
+    expect(first.masts[0]!.at.x - first.wire.at.x).toBeGreaterThan(POLE_PITCH);
+    expect(first.masts[0]!.at.x - first.peers[0]!.at.x).toBeGreaterThan(POLE_PITCH / 2);
+  });
+
+  test("none for a yard whose window heard no hook", () => {
+    const quiet = copy();
+    delete quiet.hooks;
+    expect(layout(quiet).masts).toEqual([]);
   });
 });
 
