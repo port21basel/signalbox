@@ -201,6 +201,13 @@ describe("the projection", () => {
     });
     // On no other kind are they names.
     expect(eventOf({ seq: 14, at: "t", kind: "noted", bead: "signalbox-a", data: { source: SECRET, call: SECRET, status: 200 } }, alias)).toEqual({ seq: 14, at: "t", kind: "noted", bead: "signalbox-a" });
+    // A crew member's status: its name, what it is and was, nothing else.
+    expect(eventOf({ seq: 15, at: "t", kind: "crew_status", actor: "yard", data: { crew: "yardmaster", status: "idle", was: "working", pane: SECRET } }, alias)).toEqual({
+      seq: 15,
+      at: "t",
+      kind: "crew_status",
+      data: { crew: "yardmaster", status: "idle", was: "working" },
+    });
   });
 
   test("the log's beads are the closed ones its window names", () => {

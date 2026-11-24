@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PEER_LENGTH, RETURN_Z, SIDING_Z, SLOT_PITCH, type Person } from "../src/layout";
+import { BOX_FRONT_Z, PEER_LENGTH, RETURN_Z, SIDING_Z, SLOT_PITCH, type Person } from "../src/layout";
 import {
   along,
   brake,
@@ -11,6 +11,11 @@ import {
   GOODS_MIN,
   GOODS_SECONDS,
   goodsSeconds,
+  homeward,
+  lap,
+  LAP_LENGTH,
+  LAP_SPEED,
+  LAP_X,
   puff,
   PUFF_RISE,
   PUFF_SECONDS,
@@ -347,5 +352,34 @@ describe("a works' smoke", () => {
     expect(out(0.5, 0)).toEqual([]);
     expect(out(Infinity, 0)).toEqual([]);
     expect(smokes(3600)).toBe(true);
+  });
+});
+
+describe("a crew member's lap round its box", () => {
+  test("from its place before the door round the box and back, at the same pace all round", () => {
+    expect(lap(0)).toMatchObject({ x: 0, z: BOX_FRONT_Z });
+    expect(lap(LAP_LENGTH).x).toBeCloseTo(0);
+    expect(lap(LAP_LENGTH).z).toBeCloseTo(BOX_FRONT_Z);
+    // Round to the right first, behind the box half way.
+    expect(lap(LAP_LENGTH / 4).x).toBeGreaterThan(0);
+    expect(lap(LAP_LENGTH / 2).z).toBeCloseTo(-BOX_FRONT_Z, 1);
+    const step = 0.1;
+    for (let s = 0; s < LAP_LENGTH; s += 0.37) {
+      const [a, b] = [lap(s), lap(s + step)];
+      expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeCloseTo(step, 2);
+      // Clear of the box's walls (1.5 and 1.1 from its middle), with room
+      // for the figure.
+      expect(Math.abs(a.x) > 1.7 || Math.abs(a.z) > 1.3).toBe(true);
+      expect(Math.abs(a.x)).toBeLessThanOrEqual(LAP_X + 1e-9);
+    }
+    // Unhurried: a lap is more than a quarter of a minute.
+    expect(LAP_LENGTH / LAP_SPEED).toBeGreaterThan(15);
+  });
+
+  test("home the short way round", () => {
+    expect(homeward(1)).toEqual({ left: 1, way: -1 });
+    expect(homeward(LAP_LENGTH - 1).way).toBe(1);
+    expect(homeward(LAP_LENGTH - 1).left).toBeCloseTo(1);
+    expect(homeward(LAP_LENGTH + 1)).toEqual({ left: expect.closeTo(1), way: -1 });
   });
 });

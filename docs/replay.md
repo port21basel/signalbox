@@ -69,7 +69,14 @@ card, a click anywhere else in the yard or Escape closes it, and the camera
 stays where it is. The body and the notes are asked of the yard at the
 click, so only the live page has them: the replay's card is what the
 snapshot holds, and says "notes need the live page". The yard's crew members stand before
-their signal boxes. A held bead stands in the siding. A peer's
+their signal boxes, each as its status says (the `crew_status` events of the
+window, else the snapshot's): idle, it walks round its box, slowly and at an
+even pace; working, it swings a signal bat at its door, white with a green
+middle, calmly to and fro; blocked, it stands at its door, head bowed over a
+pocket watch, and that is all: no lamp, no colour, since a pane that only
+waits is often said to be blocked. Called from its lap, it walks home the
+short way round first. With no status it stands at the door, and with
+`prefers-reduced-motion` it walks no lap and holds its pose. A held bead stands in the siding. A peer's
 message is a goods wagon on the peer's line, named by its kind and its peer:
 out from the yard's end past the edge of the yard, or in from there, a few
 seconds either way, each on its own rail. Mail is a train: the box van for

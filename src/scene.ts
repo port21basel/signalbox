@@ -10,6 +10,7 @@ import { CHIMNEY, HAT, SILO_HEIGHT, TINT, type Clip, type Kit, type Part } from 
 import {
   atWork,
   BOARD_X,
+  BOX_FRONT_Z,
   coal,
   faulted,
   HEADSHUNT,
@@ -41,6 +42,10 @@ import {
   goods,
   GOODS_STAND,
   heading,
+  homeward,
+  lap,
+  LAP_SPEED,
+  LAP_STRIDE,
   measure,
   puff,
   PUFF_SECONDS,
@@ -53,6 +58,7 @@ import {
   turnout,
   TWEEN_MIN,
   walk,
+  type Doing,
   walkSeconds,
   type Stop,
 } from "./motion";
@@ -97,6 +103,10 @@ const STEP = 0.2;
 const TURN = 9;
 const FADE = 0.2;
 const GOODS_LABEL_Y = 2.1;
+// A crew member at its box: the seconds its signal bat takes to swing there
+// and back, and its arm and head into a pose and out of it.
+const SWING = 2.6;
+const POSE = 0.6;
 // The seconds the wire stays lit after a hook.
 const FLASH = 0.6;
 // A fault's lamp: the seconds of one flash, lit for the first half of it; how
@@ -806,6 +816,74 @@ interface Walker extends Mover {
   playing?: Clip;
   // How fast its walking clip plays on this way.
   stride: number;
+  // A crew member's: what it does at its box for its status.
+  duty?: Duty;
+}
+
+// What a crew member does at its signal box for its status. Idle, it walks
+// round the box, so far along its lap; working, it swings a signal bat at the
+// door; blocked, it stands at the door and looks at its pocket watch: quiet,
+// since a pane that only waits is often said to be blocked. bat and watch are
+// how far into each pose it is, swing the seconds the bat has swung.
+interface Duty {
+  lap?: number;
+  bat: number;
+  watch: number;
+  swing: number;
+  carried: Carried;
+}
+
+// The bones a pose turns, as the pack names them, and the two things a crew
+// member may hold: its bat in the right hand, its watch in the left. A figure
+// of boxes has no bones: it holds them before it.
+interface Carried {
+  arm?: THREE.Object3D;
+  hand?: THREE.Object3D;
+  head?: THREE.Object3D;
+  bat: THREE.Group;
+  watch: THREE.Group;
+}
+
+// A disc, as flat as asked, of a sphere: a bat's, a watch's.
+function disc(of: Tone | Accent | number, radius: number, flat: number, x: number, y: number, z: number): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 4), paint(of));
+  mesh.position.set(x, y, z);
+  mesh.scale.z = flat;
+  mesh.castShadow = true;
+  return mesh;
+}
+
+// A crew member's bat and watch, in its hands and out of sight.
+function carry(figure: THREE.Object3D): Carried {
+  const arm = figure.getObjectByName("arm-right");
+  const hand = figure.getObjectByName("arm-left");
+  const head = figure.getObjectByName("head");
+  // A signal bat: white, with the green of a clear signal in its middle, on
+  // a slate stick, down from the hand.
+  const bat = new THREE.Group();
+  bat.add(block("slate", 0.018, 0.18, 0.018, 0, -0.28, 0), disc("wall", 0.09, 0.16, 0, -0.35, 0), disc(lamp.clear, 0.06, 0.4, 0, -0.35, 0));
+  const watch = new THREE.Group();
+  watch.add(disc("slate", 0.042, 0.3, 0, -0.13, 0.03), disc("wall", 0.034, 0.3, 0, -0.13, 0.038));
+  for (const [thing, holder, x] of [
+    [bat, arm, 0.3],
+    [watch, hand, -0.3],
+  ] as const) {
+    thing.visible = false;
+    if (holder) holder.add(thing);
+    else {
+      thing.position.set(x, 0.9, 0.2);
+      figure.add(thing);
+    }
+  }
+  return { ...(arm ? { arm } : {}), ...(hand ? { hand } : {}), ...(head ? { head } : {}), bat, watch };
+}
+
+// Turn a bone part of the way from where its clip has it to a pose.
+const posed = new THREE.Quaternion();
+function lean(bone: THREE.Object3D | undefined, x: number, y: number, z: number, part: number) {
+  if (!bone || part <= 0) return;
+  posed.setFromEuler(new THREE.Euler(x, y, z));
+  bone.quaternion.slerp(posed, Math.min(1, part));
 }
 
 // The turn that makes a figure look up or down the page.
@@ -1259,6 +1337,7 @@ export class Stock {
   // turned the way it goes or to what it works at, and on in what it does.
   // No time (Infinity) is where and how it ends up, at once.
   private stand(w: Walker, dt: number) {
+    if (w.person.outfit === "crew" && !w.move) return this.duty(w, dt);
     const at = w.object.position;
     const was = { x: at.x, z: at.z };
     if (w.move) {
@@ -1281,9 +1360,64 @@ export class Stock {
     w.object.rotation.y = w.heading;
     if (w.hat) w.hat.visible = moving || !w.person.sat;
 
+    this.act(w, doing(w.person, moving, !this.hauled(w.person.bead?.id)), dt);
+  }
+
+  // A crew member at its box, brought on by a time: out on its lap while it
+  // is idle, home again the short way round when it is not, then at its door
+  // in the pose of its status. No time (Infinity), or a picture that does
+  // not move, has it at the door at once, in its pose: no lap.
+  private duty(w: Walker, dt: number) {
+    const d = (w.duty ??= { bat: 0, watch: 0, swing: 0, carried: carry(w.object) });
+    const status = w.person.status;
+    const runs = Number.isFinite(dt) && !this.calm;
+    const step = runs ? LAP_SPEED * dt : 0;
+    let way = 0;
+    if (status === "idle" && !this.calm) {
+      d.lap = (d.lap ?? 0) + step;
+      way = step > 0 ? 1 : 0;
+    } else if (d.lap !== undefined) {
+      const home = homeward(d.lap);
+      if (!runs || step >= home.left) delete d.lap;
+      else {
+        d.lap += home.way * step;
+        way = home.way;
+      }
+    }
+    const door = w.person.at;
+    const p = d.lap !== undefined ? lap(d.lap) : undefined;
+    w.object.position.set(door.x + (p?.x ?? 0), 0, door.z - BOX_FRONT_Z + (p?.z ?? BOX_FRONT_Z));
+    const towards = p && way !== 0 ? p.heading + (way < 0 ? Math.PI : 0) : facing(w.person.faces);
+    w.heading = runs ? turn(w.heading, towards, TURN * dt) : towards;
+    w.object.rotation.y = w.heading;
+    this.act(w, way !== 0 ? "walk" : "idle", dt, LAP_STRIDE);
+
+    // The pose over the clip: in at the door, out on the way.
+    const home = d.lap === undefined;
+    const into = (part: number, wanted: boolean) => {
+      const to = wanted && home ? 1 : 0;
+      return runs ? (part < to ? Math.min(to, part + dt / POSE) : Math.max(to, part - dt / POSE)) : to;
+    };
+    d.bat = into(d.bat, status === "working");
+    d.watch = into(d.watch, status === "blocked");
+    if (runs) d.swing += dt;
+    const c = d.carried;
+    // The bat swings calmly to and fro, overhead; the watch is held up before
+    // the eyes, the head bowed over it.
+    lean(c.arm, -0.5, 0, -1.35 + 0.4 * Math.sin((d.swing * 2 * Math.PI) / SWING), d.bat);
+    lean(c.hand, -1, 0, -0.5, d.watch);
+    lean(c.head, 0.32, 0, 0, d.watch);
+    c.bat.visible = d.bat > 0.02;
+    c.bat.scale.setScalar(Math.max(0.02, d.bat));
+    c.watch.visible = d.watch > 0.02;
+    c.watch.scale.setScalar(Math.max(0.02, d.watch));
+  }
+
+  // A figure on in what it does: a clip at a time, faded into the next. A
+  // walk plays as fast as its way (stride), the rest at their own pace.
+  private act(w: Walker, now: Doing, dt: number, stride = w.stride) {
     const mixer = w.mixer;
     if (!mixer) return;
-    const now = doing(w.person, moving, !this.hauled(w.person.bead?.id));
     // A pack with no sitting pose: it stands idle, its back to the wagon.
     const next = w.actions[now] ?? (now === "sit" ? w.actions.idle : undefined);
     const last = w.playing !== undefined ? w.actions[w.playing] : undefined;
@@ -1303,7 +1437,7 @@ export class Stock {
     }
     // The working loop keeps its own pace at any speed of the replay; only the
     // walk is as fast as its way.
-    next?.setEffectiveTimeScale(now === "walk" ? w.stride : 1);
+    next?.setEffectiveTimeScale(now === "walk" ? stride : 1);
     mixer.update(Number.isFinite(dt) && !frozen ? dt : 0);
   }
 

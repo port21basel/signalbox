@@ -257,8 +257,9 @@ async function start() {
   // are the sources the address asked a line for: ?sources=, and the theme's
   // own, in lower case.
   const stations = [...(theme === undefined ? [] : STATIONS[theme]), ...sources(window.location.search)];
-  const plan = (at: Pick<Yard, "beads" | "edges"> & Partial<Pick<State, "works">>, now?: number) =>
-    layout({ ...yard, beads: at.beads, edges: at.edges ?? [] }, slots, now, at.works, stations);
+  // A crew member's status is the replay's where the window said one.
+  const plan = (at: Pick<Yard, "beads" | "edges"> & Partial<Pick<State, "works" | "statuses">>, now?: number) =>
+    layout({ ...yard, crew: yard.crew.map((c) => ({ ...c, status: at.statuses?.[c.name] ?? c.status })), beads: at.beads, edges: at.edges ?? [] }, slots, now, at.works, stations);
   // The quota is as it is now, whatever time the picture is of. Live, a tower
   // stands for every provider in use, and says "unknown" when nobody knows
   // its level. A snapshot's files without a quota have no tower.

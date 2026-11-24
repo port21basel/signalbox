@@ -2,7 +2,7 @@
 // rails, or a figure's over the ground, as a line of points, and where on it
 // a thing is. Pure, like layout.ts; scene.ts moves the models along it.
 
-import { HEADSHUNT, PARK_X, PEER_RAIL_Z, PLATFORM_LENGTH, RETURN_Z, SIDING_Z, SLOT_PITCH, type Person, type Point } from "./layout";
+import { BOX_FRONT_Z, HEADSHUNT, PARK_X, PEER_RAIL_Z, PLATFORM_LENGTH, RETURN_Z, SIDING_Z, SLOT_PITCH, type Person, type Point } from "./layout";
 
 // Units of ground a second: a stage's pitch takes most of one.
 export const TRAIN_SPEED = 14;
@@ -364,4 +364,46 @@ export function puff(i: number, seconds: number, burnt = Infinity): Puff | undef
     // Soon there, and thinner all the way up.
     shade: PUFF_SHADE * Math.min(1, part / 0.12) * (1 - part),
   };
+}
+
+// A crew member at leisure (idle) walks round its signal box: an ellipse this
+// far either side of the box's middle and as deep as its place before the
+// door, which lies on it, at this pace, its walking clip at this part of its
+// own. Unhurried: a lap takes some twenty seconds.
+export const LAP_X = 2.8;
+export const LAP_SPEED = 0.6;
+export const LAP_STRIDE = 0.75;
+// The lap as points of equal steps along it, from the door round to the
+// right, and how long it is.
+const LAP_STEPS = 120;
+const LAP: { points: Point[]; at: number[] } = (() => {
+  const points: Point[] = [];
+  const at = [0];
+  for (let i = 0; i <= LAP_STEPS; i++) {
+    const a = (i / LAP_STEPS) * 2 * Math.PI;
+    points.push({ x: LAP_X * Math.sin(a), z: BOX_FRONT_Z * Math.cos(a) });
+    if (i > 0) at.push(at[i - 1]! + Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.z - points[i - 1]!.z));
+  }
+  return { points, at };
+})();
+export const LAP_LENGTH = LAP.at[LAP_STEPS]!;
+
+// Where a crew member is so far along its lap, from its box's middle, and
+// the way it heads: the same pace all round, so it does not hurry at the
+// ends of the ellipse.
+export function lap(far: number): Point & { heading: number } {
+  const s = ((far % LAP_LENGTH) + LAP_LENGTH) % LAP_LENGTH;
+  let i = 1;
+  while (i < LAP_STEPS && LAP.at[i]! < s) i++;
+  const a = LAP.points[i - 1]!;
+  const b = LAP.points[i]!;
+  const part = (s - LAP.at[i - 1]!) / (LAP.at[i]! - LAP.at[i - 1]!);
+  return { x: a.x + (b.x - a.x) * part, z: a.z + (b.z - a.z) * part, heading: heading(a, b) };
+}
+
+// The way home from so far along the lap, the short way round: how far it
+// is to the door, and which way along the lap it goes (1 on, -1 back).
+export function homeward(far: number): { left: number; way: 1 | -1 } {
+  const s = ((far % LAP_LENGTH) + LAP_LENGTH) % LAP_LENGTH;
+  return s > LAP_LENGTH / 2 ? { left: LAP_LENGTH - s, way: 1 } : { left: s, way: -1 };
 }

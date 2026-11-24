@@ -681,10 +681,16 @@ describe("the mapping", () => {
     expect(people(g).filter((p) => p.platform === platform.key).map((p) => p.bead?.id)).toEqual(["sextant-old0", "sextant-old1", "sextant-old2"]);
   });
 
-  test("the yard's crew members stand before their signal boxes", () => {
+  test("the yard's crew members stand before their signal boxes, each with its status", () => {
     const crew = people(l).filter((p) => p.outfit === "crew");
     expect(crew.map((p) => p.key)).toEqual(yard.crew.map((c) => `crew/${c.name}`));
-    crew.forEach((p, c) => expect(p).toEqual({ key: p.key, outfit: "crew", at: { x: l.boxes[c]!.at.x, z: CREW_Z + BOX_FRONT_Z }, gate: { x: l.boxes[c]!.at.x, z: CREW_Z + BOX_FRONT_Z }, faces: 1 }));
+    crew.forEach((p, c) =>
+      expect(p).toEqual({ key: p.key, outfit: "crew", at: { x: l.boxes[c]!.at.x, z: CREW_Z + BOX_FRONT_Z }, gate: { x: l.boxes[c]!.at.x, z: CREW_Z + BOX_FRONT_Z }, faces: 1, status: yard.crew[c]!.status }),
+    );
+    // One the yard says no status of has none.
+    const unsaid = copy();
+    unsaid.crew = unsaid.crew.map(({ status: _status, ...c }) => c);
+    expect(people(layout(unsaid)).filter((p) => p.outfit === "crew").every((p) => !("status" in p))).toBe(true);
   });
 
   test("a held bead stands in its flow's siding, whatever its stage", () => {

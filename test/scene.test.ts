@@ -5,7 +5,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import snapshot from "../public/yard.json";
 import { banded, CHIMNEY, COLOUR, coloured, accented, flat, HAT, loadKit, SILO_HEIGHT, TINT, toned, type Kit, type Part } from "../src/kit";
-import { HEADSHUNT, layout, people, PLACE_X, RETURN_Z, SHED_WIDTH, SIDING_Z, type Gate, type Shed } from "../src/layout";
+import { BOX_FRONT_Z, HEADSHUNT, layout, people, PLACE_X, RETURN_Z, SHED_WIDTH, SIDING_Z, type Gate, type Shed } from "../src/layout";
 import { curve, GOODS_END, goodsSeconds, measure, PUFF_SECONDS, PUFFS, RUN_OUT, turnout, TWEEN_MIN, WALK_MAX } from "../src/motion";
 import { accents, building, dress, engine, fault as tint, hat, iron, lamp, liveried, livery, paint, palette, SHADE, shade, smoke, stand, steam, tinted, weathering, type Accent, type Tone } from "../src/palette";
 import { BACKLOG, COUPLING } from "../src/shunt";
@@ -2029,6 +2029,76 @@ describe("the shunters of the stock", () => {
     expect(signs.get("to quay →")).toBe(2);
     expect(signs.get("Snowflake")).toBeGreaterThan(signs.get("to quay →")!);
     expect(signs.get("Linear")).toBeGreaterThan(signs.get("Snowflake")!);
+  });
+});
+
+describe("a crew member at its box, by its status", () => {
+  const at = (status?: string) => layout({ ...yard, beads: [], crew: yard.crew.map((c) => (c.name === "yardmaster" ? { ...c, status } : { ...c, status: "working" })) });
+  const door = people(at()).find((p) => p.key === "crew/yardmaster")!.at;
+  // The figure nearest the yardmaster's door: no other is within its lap.
+  const figure = (stock: Stock) => {
+    const crew = stock.root.children.filter((o) => o.userData.crew === true);
+    return crew.reduce((a, b) => (off(b) < off(a) ? b : a));
+  };
+  const held = (o: THREE.Object3D) => {
+    // The bat is the thing with a clear signal's green; the watch the other.
+    const shown: string[] = [];
+    o.traverse((part) => {
+      if (!(part instanceof THREE.Group) || part.children.length === 0 || part === o) return;
+      const colours = part.children.map((m) => ((m as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined)?.color?.getHex());
+      if (part.visible && colours.length === 3 && colours.includes(new THREE.Color(lamp.clear).getHex())) shown.push("bat");
+      else if (part.visible && colours.length === 2) shown.push("watch");
+    });
+    return shown;
+  };
+  const off = (o: THREE.Object3D) => Math.hypot(o.position.x - door.x, o.position.z - door.z);
+  const run = (stock: Stock, seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.05) stock.tick(0.05);
+  };
+
+  test("idle, it walks round its box; working, it swings its bat at the door; blocked, it looks at its watch", () => {
+    const stock = new Stock(at("idle"), kit);
+    const ym = figure(stock);
+    expect(off(ym)).toBeCloseTo(0);
+    run(stock, 4);
+    expect(off(ym)).toBeGreaterThan(1);
+    // Round the box, never through it.
+    expect(Math.abs(ym.position.x - door.x) > 1.7 || Math.abs(ym.position.z - (door.z - BOX_FRONT_Z)) > 1.3).toBe(true);
+    expect(held(ym)).toEqual([]);
+
+    // Called to work: home the short way round, then the bat.
+    stock.show(at("working"), { tween: true });
+    run(stock, 0.2);
+    expect(off(ym)).toBeGreaterThan(0.5);
+    expect(held(ym)).toEqual([]);
+    run(stock, 8);
+    expect(off(ym)).toBeCloseTo(0);
+    expect(held(ym)).toEqual(["bat"]);
+
+    // Blocked: the watch, and no bat; nothing that flashes or calls out.
+    stock.show(at("blocked"), { tween: true });
+    run(stock, 1);
+    expect(held(ym)).toEqual(["watch"]);
+    expect(off(ym)).toBeCloseTo(0);
+  });
+
+  test("with no status it stands at its door as before; a picture that does not move has no lap", () => {
+    const stock = new Stock(at(undefined), kit);
+    const ym = figure(stock);
+    run(stock, 3);
+    expect(off(ym)).toBeCloseTo(0);
+    expect(held(ym)).toEqual([]);
+
+    const calm = new Stock(at("idle"), kit);
+    calm.still = true;
+    run(calm, 3);
+    expect(off(figure(calm))).toBeCloseTo(0);
+    // Out on its lap when the reader asks for less motion: at the door at once.
+    calm.still = false;
+    run(calm, 3);
+    expect(off(figure(calm))).toBeGreaterThan(1);
+    calm.still = true;
+    expect(off(figure(calm))).toBeCloseTo(0);
   });
 });
 

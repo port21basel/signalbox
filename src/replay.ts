@@ -41,10 +41,12 @@ export interface YardEvent {
     direction?: string;
     crew?: string;
     // Of a source call: the source, the call's name, and what the service
-    // answered, a status as text, or why the call was refused.
+    // answered, a status as text, or why the call was refused. Of a crew
+    // member's status (crew_status): what it is now, and what it was.
     source?: string;
     call?: string;
     status?: string;
+    was?: string;
     // Of a close: merged, a landing. No other reason leaves the yard.
     reason?: string;
   };
@@ -71,6 +73,10 @@ export interface State {
   // open on it, and how its last one ended. A works no run was seen at has
   // no entry.
   works: Record<string, Gate>;
+  // By crew member, its status (working, idle, blocked) as the window last
+  // said it. One the window said nothing of has none: it is as the snapshot
+  // has it.
+  statuses?: Record<string, string>;
 }
 
 // What the events do not say and the reducer needs: what a bead is, and how
@@ -289,7 +295,14 @@ function without<V>(record: Record<string, V>, key: string): Record<string, V> {
 // the event changes nothing: an unknown kind, a bead the snapshot does not
 // know, an end of a session that is not the one at work.
 export function step(state: State, event: YardEvent, w: World): State {
-  return gated(moved(state, event, w), event, w);
+  return told(gated(moved(state, event, w), event, w), event);
+}
+
+// A crew member's status after an event: what its crew_status says now.
+function told(state: State, event: YardEvent): State {
+  const { crew, status } = event.data ?? {};
+  if (event.kind !== "crew_status" || crew === undefined || status === undefined) return state;
+  return { ...state, statuses: { ...state.statuses, [crew]: status } };
 }
 
 // The works after an event, given the beads after it. A session that starts
@@ -470,7 +483,17 @@ export function opening(yard: Yard, log: Log, w: World = world(yard, log)): Stat
     const key = bead.working === true ? w.works(bead, bead.stage) : undefined;
     if (key !== undefined) works[key] = { runs: [...(works[key]?.runs ?? []), { bead: bead.id }] };
   }
-  return { beads, sessions: {}, edges: waits(yard, log), works };
+  // A crew member the window says a status of was, before the first, what
+  // that one says it was.
+  const statuses: Record<string, string> = {};
+  const told = new Set<string>();
+  for (const e of log.events) {
+    const { crew, was } = e.data ?? {};
+    if (e.kind !== "crew_status" || crew === undefined || told.has(crew)) continue;
+    told.add(crew);
+    if (was !== undefined) statuses[crew] = was;
+  }
+  return { beads, sessions: {}, edges: waits(yard, log), works, ...(Object.keys(statuses).length > 0 ? { statuses } : {}) };
 }
 
 // The yard after the window's first n events.

@@ -116,6 +116,23 @@ describe("the reducer", () => {
     expect(platform(run([event("unheld", "sextant-a")], held), "sextant-a")).toBe("sextant/default/new");
   });
 
+  test("a crew member's status is the last its crew_status said; before the first, what that one says it was", () => {
+    const said = (crew: string, status: string, was: string) => event("crew_status", undefined, { crew, status, was });
+    expect(run([said("flagman", "working", "idle")], start).statuses).toEqual({ flagman: "working" });
+    expect(run([said("flagman", "working", "idle"), said("flagman", "blocked", "working"), said("yardmaster", "idle", "working")], start).statuses).toEqual({
+      flagman: "blocked",
+      yardmaster: "idle",
+    });
+    // No crew, or no status: nothing changes.
+    expect(run([event("crew_status", undefined, { status: "idle" }), event("crew_status", undefined, { crew: "flagman" })], start)).toBe(start);
+    // The window's start: each as its first status event says it was, the
+    // rest as the snapshot has them.
+    const window: Log = { ...log, events: [said("flagman", "working", "blocked"), said("flagman", "idle", "working"), event("crew_status", undefined, { crew: "yardmaster", status: "idle" })] };
+    expect(opening(yard, window).statuses).toEqual({ flagman: "blocked" });
+    expect(state(yard, window).statuses).toEqual({ flagman: "idle", yardmaster: "idle" });
+    expect(opening(yard, log).statuses).toBeUndefined();
+  });
+
   test("unknown kinds leave the state unchanged", () => {
     expect(FAULTS.has("constructor")).toBe(false);
     const kinds = ["noted", "crew_status", "hook", "peer_message_sent", "peer_message_received", "source_call", "a_kind_of_tomorrow", ""];

@@ -207,7 +207,10 @@ const OF_ADVANCE = ["from", "to", "outcome"];
 const OF_EDGE = ["from"];
 const OF_CREATED = ["stage"];
 const OF_SOURCE_CALL = ["source", "call"];
-const MORE: Record<string, string[]> = { advanced: OF_ADVANCE, dep_added: OF_EDGE, dep_removed: OF_EDGE, created: OF_CREATED, source_call: OF_SOURCE_CALL };
+// A crew member's status keeps what it is now and was before (working, idle,
+// blocked): the yard's words for its pane, no more.
+const OF_CREW_STATUS = ["status", "was"];
+const MORE: Record<string, string[]> = { advanced: OF_ADVANCE, dep_added: OF_EDGE, dep_removed: OF_EDGE, created: OF_CREATED, source_call: OF_SOURCE_CALL, crew_status: OF_CREW_STATUS };
 // A close's reason is what somebody wrote, but for the yard's own word for a
 // landing: that one is passed on, and no other.
 const LANDED = "merged";

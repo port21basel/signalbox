@@ -280,6 +280,8 @@ export interface Person {
   bead?: Bead;
   // Sat at that bead, hat off: its session ended badly.
   sat?: true;
+  // A crew member at its signal box: its status, where the yard says one.
+  status?: string;
 }
 
 // A bead on a track: a wagon, or the locomotive of a train.
@@ -331,6 +333,8 @@ export interface SignalBox {
   key: string;
   name: string;
   at: Point;
+  // Its crew member's status, where the yard says one: working, idle, blocked.
+  status?: string;
 }
 
 // A provider's tower: the silo of the quota its agents burn, drawn as coal
@@ -833,7 +837,7 @@ export function layout(yard: Yard, memory: Partial<Slots> = {}, now: number = Da
   }
 
   yard.crew.forEach((member, c) => {
-    out.boxes.push({ key: `crew/${member.name}`, name: member.name, at: { x: c * CREW_PITCH, z: CREW_Z } });
+    out.boxes.push({ key: `crew/${member.name}`, name: member.name, at: { x: c * CREW_PITCH, z: CREW_Z }, ...(member.status !== undefined ? { status: member.status } : {}) });
   });
   for (const provider of providers(yard)) {
     out.towers.push({ key: `tower/${provider}`, provider, at: { x: TOWER_X - slots.towers[provider]! * CREW_PITCH, z: CREW_Z } });
@@ -947,7 +951,7 @@ export function people(l: Layout, before: readonly Person[] = []): Person[] {
   // Before its box, on the side of the yard.
   for (const box of l.boxes) {
     const at = { x: box.at.x, z: box.at.z + BOX_FRONT_Z };
-    out.push({ key: box.key, outfit: "crew", at, gate: at, faces: 1 });
+    out.push({ key: box.key, outfit: "crew", at, gate: at, faces: 1, ...(box.status !== undefined ? { status: box.status } : {}) });
   }
   return out;
 }
