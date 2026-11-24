@@ -85,5 +85,9 @@
   "towers": {
     "kimi": 0,
     "claude": 1
+  },
+  "masts": {
+    "chat": 0,
+    "github": 1
   }
 }

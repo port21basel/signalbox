@@ -233,7 +233,7 @@ export function calls(events: readonly YardEvent[]): SourceCall[] {
 }
 
 // The kinds that change what the yard is built of: a depot, a flow, a group,
-// a route, a peer, a crew, or a pack that brings any of them. No event
+// a route, a peer, a crew, a hook (its mast), or a pack that brings any of them. No event
 // carries the structure itself, so a page that follows the yard takes a new
 // snapshot on these.
 export const STRUCTURE = new Set([
@@ -252,6 +252,8 @@ export const STRUCTURE = new Set([
   "peer_renamed",
   "crew_defined",
   "crew_deleted",
+  "hook_added",
+  "hook_removed",
   "pack_applied",
 ]);
 

@@ -445,6 +445,8 @@ export interface Slots {
   stages: Record<string, Record<string, number>>;
   peers: Record<string, number>;
   towers: Record<string, number>;
+  // A hook's mast: its span of the wire, counted from the first it may take.
+  masts: Record<string, number>;
 }
 
 // The stages of a flow in the order a bead travels them: breadth first along
@@ -498,10 +500,10 @@ function seatStages(taken: Record<string, number> | undefined, flow: Flow): Reco
   return Object.fromEntries(order.map((name, i) => [name, i]));
 }
 
-// A slot for every depot, flow, stage, peer and provider of the yard: the
-// remembered one, else the next free one in order of first sight (depots,
-// flows and peers as the yard lists them, providers as its groups and then
-// its crew name them). A flow's stages are seated in the order a bead
+// A slot for every depot, flow, stage, peer, provider and hook of the yard:
+// the remembered one, else the next free one in order of first sight (depots,
+// flows, peers and hooks as the yard lists them, providers as its groups and
+// then its crew name them). A flow's stages are seated in the order a bead
 // travels them. What memory holds and the yard does not is kept, except a
 // stage a flow no longer has: that flow's track closes up.
 export function place(yard: Yard, memory: Partial<Slots> = {}): Slots {
@@ -511,6 +513,7 @@ export function place(yard: Yard, memory: Partial<Slots> = {}): Slots {
     stages: { ...memory.stages },
     peers: seat(memory.peers, yard.peers.map((p) => p.name)),
     towers: seat(memory.towers, providers(yard)),
+    masts: seat(memory.masts, yard.hooks ?? []),
   };
   for (const { depot, flows } of yard.flows) {
     out.flows[depot] = seat(out.flows[depot], flows.map((f) => f.name));
@@ -878,10 +881,12 @@ export function layout(yard: Yard, memory: Partial<Slots> = {}, now: number = Da
   // A slot of its own below those, as a station takes: what left the yard
   // keeps its slot above it, and a source's station its own.
   out.billboard.z = PEER_Z - ++rank * PEER_PITCH;
-  (yard.hooks ?? []).forEach((source, i) => {
-    out.masts.push({ key: `mast/${source}`, source, at: { x: BOARD_X + (MAST_SPAN + i + 0.5) * POLE_PITCH, z: WIRE_Z + MAST_Z } });
-  });
-  out.wire.length = Math.max(right, yard.crew.length * CREW_PITCH, BOARD_X + (MAST_SPAN + out.masts.length) * POLE_PITCH) - BOARD_X;
+  // A hook's mast keeps its span when another joins or leaves the wire.
+  for (const source of yard.hooks ?? []) {
+    out.masts.push({ key: `mast/${source}`, source, at: { x: BOARD_X + (MAST_SPAN + slots.masts[source]! + 0.5) * POLE_PITCH, z: WIRE_Z + MAST_Z } });
+  }
+  const spans = Math.max(0, ...out.masts.map((m) => slots.masts[m.source]! + 1));
+  out.wire.length = Math.max(right, yard.crew.length * CREW_PITCH, BOARD_X + (MAST_SPAN + spans) * POLE_PITCH) - BOARD_X;
   return out;
 }
 

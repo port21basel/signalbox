@@ -831,7 +831,7 @@ describe("live", () => {
   test("what a snapshot does not hold asks for a new one", () => {
     const at = (kind: string, id?: string, data?: YardEvent["data"]) => outgrown(event(kind, id, data), w);
     // The kinds yardr logs for a change of structure (internal/store).
-    for (const kind of ["depot_updated", "depot_removed", "flow_set", "flow_removed", "group_set", "group_removed", "route_added", "route_removed", "peer_added", "peer_removed", "peer_renamed", "crew_defined", "pack_applied"]) {
+    for (const kind of ["depot_updated", "depot_removed", "flow_set", "flow_removed", "group_set", "group_removed", "route_added", "route_removed", "peer_added", "peer_removed", "peer_renamed", "crew_defined", "hook_added", "hook_removed", "pack_applied"]) {
       expect(STRUCTURE.has(kind), kind).toBe(true);
       expect(at(kind), kind).toBe(true);
     }

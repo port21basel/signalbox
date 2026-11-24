@@ -1,6 +1,6 @@
 // Write the layout's memory beside a snapshot: the slot of every depot, flow,
-// stage, peer and provider's tower (src/layout.ts, place). A depot, a flow, a
-// peer and a tower keep the slot the file gave them. A flow's stages are
+// stage, peer, provider's tower and hook's mast (src/layout.ts, place). A
+// depot, a flow, a peer, a tower and a mast keep the slot the file gave them. A flow's stages are
 // seated again when they, or the order a bead travels them, are not the ones
 // the file holds.
 //

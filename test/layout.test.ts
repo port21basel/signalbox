@@ -1067,6 +1067,23 @@ describe("a mast at the wire for every source of hooks", () => {
     expect(first.masts[0]!.at.x - first.peers[0]!.at.x).toBeGreaterThan(POLE_PITCH / 2);
   });
 
+  test("a mast keeps its span when another source joins or leaves the wire", () => {
+    const one = copy();
+    one.hooks = ["telegram"];
+    const memory = place(one);
+    const grown = copy();
+    grown.hooks = ["chat", "telegram"];
+    const l = layout(grown, memory);
+    const x = (source: string) => l.masts.find((m) => m.source === source)!.at.x;
+    expect(x("telegram")).toBe(layout(one).masts[0]!.at.x);
+    expect(x("chat")).toBe(x("telegram") + POLE_PITCH);
+    expect(place(grown, memory).masts).toEqual({ telegram: 0, chat: 1 });
+    // Gone from the wire: the gap stays, and the next keeps its span.
+    const fewer = copy();
+    fewer.hooks = ["chat"];
+    expect(layout(fewer, place(grown, memory)).masts[0]!.at.x).toBe(x("chat"));
+  });
+
   test("none for a yard whose window heard no hook", () => {
     const quiet = copy();
     delete quiet.hooks;

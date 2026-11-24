@@ -140,13 +140,21 @@ export function yardOf(lists: Lists, taken_at: string): Yard {
   return yard as unknown as Yard;
 }
 
-// The sources the window's hooks came from, each once, by name: a mast each
-// at the wire. The view lists no hooks, and no command of yardr's is run, so
-// a source whose last hook is older than the window has none until its next.
+// The hooks the window knows of, each once, by name: a mast each at the
+// wire. A hook that came in, or was added, is one; one removed since is not.
+// The view lists no hooks, and no command of yardr's is run, so a hook added
+// before the window and silent since has none until its next hook.
 function sources(events: Raw[]): string[] {
-  const names = events.filter((e) => e.kind === "hook").map((e) => hookOf(record(e.data)));
-  return [...new Set(names.filter((n) => n !== undefined))].sort();
+  const names = new Set<string>();
+  for (const e of [...events].sort((a, b) => Number(a.seq) - Number(b.seq))) {
+    const name = HOOKED.has(String(e.kind)) ? hookOf(record(e.data)) : undefined;
+    if (name === undefined) continue;
+    if (e.kind === "hook_removed") names.delete(name);
+    else names.add(name);
+  }
+  return [...names].sort();
 }
+const HOOKED = new Set(["hook", "hook_added", "hook_removed"]);
 
 // The name of the source a hook came from, as its data has it (hook, else
 // source), where it is a name: a short word, never a message's text.
@@ -246,8 +254,8 @@ export function eventOf(raw: Raw, alias: (session: string) => string): YardEvent
   // values, bytes and how long it took stay behind: the page is public.
   if (raw.kind === "source_call" && (typeof from.status === "string" || typeof from.status === "number")) data.status = String(from.status);
   // A hook keeps the name of its source, and nothing it carried: no text,
-  // no sender.
-  const hook = raw.kind === "hook" ? hookOf(from) : undefined;
+  // no sender. So does a hook added or removed: not who approved it.
+  const hook = HOOKED.has(String(raw.kind)) ? hookOf(from) : undefined;
   if (hook !== undefined) data.hook = hook;
   const event = pick(raw, ["seq", "at", "kind", "bead"], { data: Object.keys(data).length > 0 ? data : null });
   return event as unknown as YardEvent;

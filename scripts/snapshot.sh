@@ -27,6 +27,6 @@ mkdir -p "$(dirname "$out")"
 node "$here/snapshot.mjs" "$out"
 
 # The layout's memory: written when it is missing, and brought up to date
-# otherwise. A depot, a flow, a peer and a tower keep their slot. A flow's
-# stages are seated again when the flow changes.
+# otherwise. A depot, a flow, a peer, a tower and a mast keep their slot. A
+# flow's stages are seated again when the flow changes.
 node "$here/slots.mjs" "$out" "$(dirname "$out")/layout.json"

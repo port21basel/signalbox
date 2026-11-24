@@ -246,9 +246,10 @@ const WAITS = [
   ["wharf-l2df", "wharf-v7gq", "15:22"],
 ];
 
-// What happens beside the beads: a peer's messages and the hooks of the
-// depots' hosting, which come from its source: github. A landing and a train in its pull request bring their own
-// hooks (landed, below).
+// What happens beside the beads: a peer's messages, the hooks of the
+// depots' hosting, which come from its source, github, and the messages of a
+// chat, a hook added in the morning. A landing and a train in its pull
+// request bring their own hooks (landed, below).
 const EXTRAS = [
   ["08:15", "peer_message_received", { peer: "quay", kind: "ping" }],
   ["08:15", "peer_message_sent", { peer: "quay", kind: "ping" }],
@@ -269,6 +270,11 @@ const EXTRAS = [
   ["16:08", "peer_message_received", { peer: "quay", kind: "mail" }],
   ["17:05", "hook", { hook: "github", type: "issue" }],
   ["18:20", "peer_message_sent", { peer: "quay", kind: "mail" }],
+  // The chat's last: the rest of the day keeps its times.
+  ["07:58", "hook_added", { hook: "chat" }],
+  ["11:20", "hook", { hook: "chat", type: "message" }],
+  ["15:58", "hook", { hook: "chat", type: "message" }],
+  ["19:12", "hook", { hook: "chat", type: "message" }],
 ];
 
 const MINUTE = 60_000;

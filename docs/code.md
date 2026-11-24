@@ -45,18 +45,18 @@
   imports a file that is not on it. It needs the Node the archive needs,
   22.6 or later (`engines`).
 - `layout.json` beside a `yard.json` is the layout's memory for it: the
-  slot of every depot, flow, stage, peer and provider's silo drawn so far. The
-  snapshot script writes it when it is missing and brings it up to date
-  otherwise (`scripts/slots.mjs`): a depot, a flow, a peer and a tower keep
-  their slot, and a flow's stages are seated again when the flow changes.
+  slot of every depot, flow, stage, peer, provider's silo and hook's mast
+  drawn so far. The snapshot script writes it when it is missing and brings
+  it up to date otherwise (`scripts/slots.mjs`): a depot, a flow, a peer, a
+  tower and a mast keep their slot, and a flow's stages are seated again when the flow changes.
   The static page and the tests only read it.
   Delete it to have that yard laid out afresh. The demo's is written with
   the demo, from slot 0.
 - `src/yard.ts`: the shape of the snapshot, and of `quota.json`.
 - `src/layout.ts`: from the structure to positions, one pure function. A
   flow's stages stand in the order a bead travels them, its terminal stage
-  last. A depot, a flow, a peer and a tower with a slot in `layout.json` keep
-  it, so a yard that grows or is listed in another order keeps what it had
+  last. A depot, a flow, a peer, a tower and a mast with a slot in
+  `layout.json` keep it, so a yard that grows or is listed in another order keeps what it had
   where it was. A flow's stages keep theirs only while that order is the one
   remembered; when the stages or the transitions change, they are seated
   again and the track closes up. The mapping from yard to railway is

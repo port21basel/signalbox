@@ -89,9 +89,12 @@ out of sight, and they come back one by one, a minute, four and ten after
 its last hook, by the replay's clock; a hook before they are all back sends
 every one off again. While any is away, that source said something lately.
 A scrub has them where they would be at that time, at once, and so has
-`prefers-reduced-motion`. The view lists no hooks, so a source whose last
-hook is older than the window has no mast until its next one: that hook
-takes a new snapshot, which draws it.
+`prefers-reduced-motion`. A hook added (`hook_added`) has its mast at once,
+before it says anything, and one removed loses it: both take a new
+snapshot, as a hook from a source with no mast does. A mast keeps its span
+when another joins or leaves the wire (`layout.json`). The view lists no
+hooks, so a hook added before the window and silent since has no mast
+until its next one.
 
 What went wrong is drawn too, and says under the pointer what and when
 ("held", "session stalled 14:02", "move refused 06:27"):

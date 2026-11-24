@@ -59,6 +59,12 @@ describe("the projection", () => {
       { seq: 7, at: "t", kind: "source_call", data: { source: "snowflake", call: "query" } },
     ];
     expect(yardOf({ ...lists, events }, "2099-01-01T00:00:00Z").hooks).toEqual(["github", "telegram"]);
+    // A hook added is one before it says anything; one removed is gone, in the
+    // log's order whatever order the view lists the window in.
+    const added = { seq: 8, at: "t", kind: "hook_added", actor: SECRET, data: { approved: { ask: 1, bead: SECRET }, hook: "mail", source: "imap" } };
+    const removed = { seq: 9, at: "t", kind: "hook_removed", data: { hook: "github" } };
+    expect(yardOf({ ...lists, events: [removed, ...events, added] }, "2099-01-01T00:00:00Z").hooks).toEqual(["mail", "telegram"]);
+    expect(eventOf(added, alias)).toEqual({ seq: 8, at: "t", kind: "hook_added", data: { hook: "mail" } });
     expect(events.map((e) => eventOf(e, alias).data)).toEqual([
       { type: "message", hook: "telegram" },
       { type: "issue", hook: "github" },
