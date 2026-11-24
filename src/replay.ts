@@ -510,7 +510,7 @@ export function heard(events: readonly YardEvent[]): Record<string, number> {
     const source = e.kind === "hook" ? e.data?.hook : undefined;
     const at = Date.parse(e.at);
     if (source === undefined || Number.isNaN(at)) continue;
-    out[source] = Math.max(out[source] ?? -Infinity, at);
+    out[source] = Math.max(Object.hasOwn(out, source) ? out[source]! : -Infinity, at);
   }
   return out;
 }

@@ -813,6 +813,8 @@ describe("live", () => {
     const events = [hook(1000, { hook: "github" }), hook(2000, { hook: "telegram" }), hook(3000, { hook: "github" }), hook(4000), hook(5000, { hook: "telegram" })];
     expect(heard(events)).toEqual({ github: 3000, telegram: 5000 });
     expect(heard([])).toEqual({});
+    // A valid source name may also name a property of Object.prototype.
+    expect(heard([hook(1000, { hook: "constructor" }), hook(2000, { hook: "toString" }), hook(3000, { hook: "constructor" })])).toEqual({ constructor: 3000, toString: 2000 });
     const p = new Player({ ...yard, beads: [] }, { taken_at: "", beads: [], events }, 6000);
     p.seek(2500);
     expect(p.heard).toEqual({ github: 1000, telegram: 2000 });
